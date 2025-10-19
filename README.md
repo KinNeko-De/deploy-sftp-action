@@ -24,4 +24,27 @@ If you encounter issues with this action consider using lftp as an alternative. 
 
 # Usage
 
-See the action.yml for input parameters and example workflow usage.
+This repository can be used directly as a GitHub Action. Add a step to your workflow that uses this repository. Note: this action expects `sshpass` and `sftp` to be available on the runner; GitHub-hosted Ubuntu runners typically include these tools.
+
+Inputs
+
+- `ftp_username` (required): SFTP username.
+- `ftp_password` (required): SFTP password. Use a secret for this.
+- `ftp_server` (required): SFTP server hostname or IP.
+- `ftp_port` (optional): SFTP port (default: 22).
+- `local_dir` (optional): Local directory to upload (default: `.`).
+- `remote_dir` (optional): Remote directory on the server to upload into (default: `.`).
+
+## Example 
+
+```yaml
+- name: Deploy via SFTP
+  uses: KinNeko-De/deploy-sftp-action@main
+  with:
+    ftp_username: ${{ secrets.SFTP_USERNAME }}
+    ftp_password: ${{ secrets.SFTP_PASSWORD }}
+    ftp_server: ${{ secrets.SFTP_SERVER }}
+    ftp_port: 22
+    local_dir: public
+    remote_dir: .
+```

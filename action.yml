@@ -1,0 +1,51 @@
+name: "SFTP Deploy Action for IONOS"
+description: "Deploy static sites to IONOS via SFTP. Scans remote directories, removes remote-only files and uploads local content."
+author: "KinNeko-De"
+inputs:
+  ftp_username:
+    description: "SFTP username"
+    required: true
+  ftp_password:
+    description: "SFTP password (use GitHub Secrets)"
+    required: true
+  ftp_server:
+    description: "SFTP server hostname or IP"
+    required: true
+  ftp_port:
+    description: "SFTP port (default 22)"
+    required: false
+    default: "22"
+  local_dir:
+    description: "Local directory to upload (relative to repository root). Default is '.'"
+    required: false
+    default: "."
+  remote_dir:
+    description: "Remote directory to upload into on the server. Default is '.'"
+    required: false
+    default: "."
+runs:
+  using: "composite"
+  steps:
+    - name: Verify runtime dependencies
+      shell: bash
+      run: |
+        if ! command -v sshpass >/dev/null; then
+          echo "Error: sshpass not found on the runner. Please use a runner with sshpass installed (e.g. a GitHub-hosted ubuntu runner) or install sshpass manually."
+          exit 1
+        fi
+        if ! command -v sftp >/dev/null; then
+          echo "Error: sftp not found on the runner. Please ensure openssh-client is available."
+          exit 1
+        fi
+
+    - name: Run deploy script
+      shell: bash
+      env:
+        FTP_USERNAME: ${{ inputs.ftp_username }}
+        FTP_PASSWORD: ${{ inputs.ftp_password }}
+        FTP_SERVER: ${{ inputs.ftp_server }}
+        FTP_PORT: ${{ inputs.ftp_port }}
+        LOCAL_DIR: ${{ inputs.local_dir }}
+        REMOTE_DIR: ${{ inputs.remote_dir }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/deploy-sftp.sh"
