@@ -1,0 +1,98 @@
+name: cicd
+
+on:
+  push:
+
+env:
+  MAJOR: 0
+  MINOR: 0
+  PATCH: 1
+
+permissions:
+  contents: write
+
+jobs:
+  ci:
+    name: Continuous Integration
+    outputs:
+      semantic_version: ${{ steps.semantic_version.outputs.semantic_version }}
+      git_tag: ${{ steps.prepare_tag.outputs.git_tag }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compute semantic version
+        id: semantic_version
+        uses: KinNeko-De/compute-semantic-version-action@v1
+        with:
+          major: ${{ env.MAJOR }}
+          minor: ${{ env.MINOR }}
+          patch: ${{ env.PATCH }}
+
+      - name: Prepare git tags
+        id: prepare_tag
+        run: |
+          echo "git_tag=v${{ steps.semantic_version.outputs.semantic_version }}" >> $GITHUB_OUTPUT
+          echo "git_tag_major=v${{ env.MAJOR }}" >> $GITHUB_OUTPUT
+
+      - name: "Version upgraded?"
+        id: version_check
+        run: |
+          current_version="v${{ steps.semantic_version.outputs.next_default_branch_version }}"
+          last_main_version=$(git tag --list | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
+          if [[ -z "$last_main_version" ]]; then
+            echo "No previous version found, proceeding..."
+          else
+            echo "Compare last main version: $last_main_version with current version: $current_version"
+            if [[ $(echo -e "$current_version\n$last_main_version" | sort -V | head -n 1) == "$current_version" ]]; then
+              echo "Please upgrade the version number to a higher value than $last_main_version"
+              exit 1
+            fi
+          fi
+
+      - name: Move major version  ${{ steps.prepare_tag.outputs.git_tag_major }} tag
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/github-script@v8
+        env:
+          majorTag: ${{ steps.prepare_tag.outputs.git_tag_major }}
+        with:
+          script: |
+            const majorTag = process.env.majorTag;
+
+            core.debug("Delete the major tag ")
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${majorTag}`
+              });
+              core.debug(`Deleted existing tag ${majorTag}`);
+            } catch (err) {
+              core.info(`Tag ${majorTag} did not exist or could not be deleted: ${err.message}`);
+            }
+
+            core.debug(`Create the major tag at the current commit`);
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/${majorTag}`,
+              sha: context.sha
+            });
+            core.info(`Created tag ${majorTag} at ${context.sha}`);
+
+      - name: "Create semantic versioning git tag ${{ steps.prepare_tag.outputs.git_tag }}" 
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: "refs/tags/${{ steps.prepare_tag.outputs.git_tag }}",
+              sha: context.sha
+            })
+
+      - name: Delete outdated git tags
+        uses: KinNeko-De/cleanup-outdated-tag-action@v0
