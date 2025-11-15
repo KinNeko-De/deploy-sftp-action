@@ -15,6 +15,9 @@ echo "Using LOCAL_DIR: $LOCAL_DIR"
 echo "Using REMOTE_DIR: $REMOTE_DIR"
 PORT=${FTP_PORT:-22}
 
+# Set SSHPASS environment variable for sshpass (more secure than -p flag)
+export SSHPASS="$FTP_PASSWORD"
+
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
@@ -46,7 +49,7 @@ echo "." > "$dirs_to_scan"
 # Ensure remote directory exists (create if missing, ignore error if exists)
 echo "Ensuring remote directory exists: $REMOTE_DIR"
 mkdir_output="$tmpdir/sftp_mkdir_output.txt"
-printf '%s\n' "mkdir $REMOTE_DIR" "bye" | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$mkdir_output" 2>&1 || true
+printf '%s\n' "mkdir $REMOTE_DIR" "bye" | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$mkdir_output" 2>&1 || true
 
 if [ ! -s "$mkdir_output" ]; then
   echo "No output from SFTP mkdir command"
@@ -63,7 +66,7 @@ fi
 if [ -n "${REMOTE_DIR-}" ] && [ "$REMOTE_DIR" != "." ]; then
   echo "Checking remote directory existence: $REMOTE_DIR"
   sftp_guard_output="$tmpdir/sftp_guard_check.txt"
-  printf '%s\n' "cd $REMOTE_DIR" 'bye' | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$sftp_guard_output" 2>&1
+  printf '%s\n' "cd $REMOTE_DIR" 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$sftp_guard_output" 2>&1
   sftp_guard_exit_code=$?
   if grep -q "No such file or directory" "$sftp_guard_output"; then
     echo "SFTP exit code for guard: $sftp_guard_exit_code"
@@ -91,9 +94,9 @@ while true; do
   # Guard: check if remote directory exists before scanning
   dir_guard_output="$tmpdir/dir_guard_$current_dir.txt"
   if [ "$current_dir" = "." ]; then
-    printf '%s\n' "cd $REMOTE_DIR" 'bye' | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$dir_guard_output" 2>&1
+    printf '%s\n' "cd $REMOTE_DIR" 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$dir_guard_output" 2>&1
   else
-    printf '%s\n' "cd $REMOTE_DIR/$current_dir" 'bye' | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$dir_guard_output" 2>&1
+    printf '%s\n' "cd $REMOTE_DIR/$current_dir" 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$dir_guard_output" 2>&1
   fi
   if grep -q "No such file or directory" "$dir_guard_output"; then
     echo "Warning: Remote directory not found (guard): $current_dir. Skipping."
@@ -102,9 +105,9 @@ while true; do
 
   ls_output="$tmpdir/ls_current.txt"
   if [ "$current_dir" = "." ]; then
-    printf '%s\n' "cd $REMOTE_DIR" 'ls -l' 'bye' | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$ls_output" 2>&1 || true
+    printf '%s\n' "cd $REMOTE_DIR" 'ls -l' 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$ls_output" 2>&1 || true
   else
-    printf '%s\n' "cd $REMOTE_DIR/$current_dir" 'ls -l' 'bye' | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$ls_output" 2>&1 || true
+    printf '%s\n' "cd $REMOTE_DIR/$current_dir" 'ls -l' 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$ls_output" 2>&1 || true
   fi
 
   # If directory does not exist, skip further processing for this dir (redundant, but extra safe)
@@ -178,7 +181,7 @@ if [ -s "$delete_files" ] || [ -s "$delete_dirs" ]; then
   echo "Delete batch commands:"
   cat "$sftp_delete_batch"
 
-  (cat "$sftp_delete_batch"; echo "bye") | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER"
+  (cat "$sftp_delete_batch"; echo "bye") | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER"
 else
   echo "No remote-only files to delete."
 fi
@@ -189,6 +192,6 @@ if ! find "$LOCAL_DIR" -maxdepth 1 -type f ! -name '.*' | grep -q .; then
   echo "Error: No files found in $LOCAL_DIR to upload (excluding hidden files)."
   exit 3
 fi
-printf '%s\n' "cd $REMOTE_DIR" "lcd $LOCAL_DIR" 'put -r *' 'bye' | sshpass -p "$FTP_PASSWORD" sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER"
+printf '%s\n' "cd $REMOTE_DIR" "lcd $LOCAL_DIR" 'put -r *' 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER"
 
 echo "Deployment completed"
