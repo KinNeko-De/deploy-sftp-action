@@ -96,3 +96,17 @@ jobs:
 
       - name: Delete outdated git tags
         uses: KinNeko-De/cleanup-outdated-tag-action@v0
+
+  cd:
+    name: Continuous Delivery
+    needs: ci
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Create release ${{ needs.ci.outputs.semantic_version }}"
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ needs.ci.outputs.git_tag }}"
+          generate_release_notes: true
+          draft: false
+          prerelease: false
