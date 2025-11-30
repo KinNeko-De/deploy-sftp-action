@@ -31,8 +31,6 @@ delete_files="$tmpdir/delete_files.txt"
 delete_dirs="$tmpdir/delete_dirs.txt"
 sftp_delete_batch="$tmpdir/sftp_delete_batch.txt"
 
-
-
 # Scan local files and directories first
 
 # Build remote file and directory lists by recursively scanning the remote directory
@@ -121,7 +119,8 @@ while true; do
     [ -z "$line" ] && continue
 
     first_char="${line:0:1}"
-    name=$(echo "$line" | cut -d' ' -f9-)
+    # Robustly extract the last field (filename or directory name) from ls -l output
+    name=$(echo "$line" | awk '{print $NF}')
     [ "$name" = "." ] || [ "$name" = ".." ] && continue
 
     if [ "$current_dir" = "." ]; then
