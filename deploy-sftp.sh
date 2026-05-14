@@ -90,7 +90,8 @@ while true; do
   echo "Scanning remote directory: $current_dir"
 
   # Guard: check if remote directory exists before scanning
-  dir_guard_output="$tmpdir/dir_guard_$current_dir.txt"
+  safe_dir_name="${current_dir//\//_}" # Because of nested directories like "de/contact"
+  dir_guard_output="$tmpdir/dir_guard_$safe_dir_name.txt"
   if [ "$current_dir" = "." ]; then
     printf '%s\n' "cd $REMOTE_DIR" 'bye' | sshpass -e sftp -oBatchMode=no -oStrictHostKeyChecking=no -P "$PORT" "$FTP_USERNAME@$FTP_SERVER" > "$dir_guard_output" 2>&1
   else
